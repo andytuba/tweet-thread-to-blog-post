@@ -1,50 +1,51 @@
-// Search for public Tweets across the whole Twitter archive
-// https://developer.twitter.com/en/docs/twitter-api/tweets/search/quick-start/full-archive-search
+const Twit = require('twit');
 
-const needle = require('needle');
+const MS = {
+    DAY: 24 * 60 * 60 * 1000,
+};
 
-// The code below sets the bearer token from your environment variables
-// To set environment variables on macOS or Linux, run the export command below from the terminal:
-// export BEARER_TOKEN='YOUR-TOKEN'
+const userAgent = process.env.USER_AGENT || 'andytuba app';
 const token = process.env.BEARER_TOKEN;
+if (!token) throw new Error("No bearer token");
 
-const endpointUrl = 'https://api.twitter.com/2/tweets/search/all'
+const username = process.env.TWITTER_CURUSER_USERNAME;
+var T = new Twit({
+    consumer_key:         process.env.TWITTER_CONSUMER_KEY,
+    consumer_secret:      process.env.TWITTER_CONSUMER_SECRET,
+    access_token:         process.env.TWITTER_CURUSER_ACCESS_TOKEN,
+    access_token_secret:  process.env.TWITTER_CURUSER_ACCESS_SECRET,
+});
 
-async function getRequest() {
 
-    // These are the parameters for the API request
-    // specify Tweet IDs to fetch, and any additional fields that are required
-    // by default, only the Tweet ID and text are returned
+async function getRecentTweets() {
+    const date = new Date(new Date().getTime() - (2 * MS.DAY));
+    const endpointPath = 'search/tweets';
     const params = {
-        'query': 'from:twitterdev -is:retweet',
-        'tweet.fields': 'author_id'
+        'q': `from:${username} -is:retweet since:${date.toISOString().split('T')[0]}`,
     }
 
-    const res = await needle('get', endpointUrl, params, {
-        headers: {
-            "User-Agent": "v2FullArchiveJS",
-            "authorization": `Bearer ${token}`
-        }
-    })
-
-    if (res.body) {
-        return res.body;
-    } else {
+    console.debug('getRequest', endpointPath, params);
+    const res = await T.get(endpointPath, params);
+    console.debug('getRequest response', res);
+    if (!res || res.resp.statusCode !== 200) {
+        console.error(res);
         throw new Error('Unsuccessful request');
     }
+    return res.data;
 }
 
 (async () => {
-
+    let searchResults; 
     try {
-        // Make request
-        const response = await getRequest();
-        console.dir(response, {
+        searchResults = await getRecentTweets();
+        console.log('getRequest data');
+        console.dir(searchResults, {
             depth: null
         });
 
     } catch (e) {
-        console.log(e);
+        console.error('getRequest failed');
+        console.error(e);
         process.exit(-1);
     }
     process.exit();

@@ -1,0 +1,27 @@
+{
+  "name": "tweet-thread-to-blog-post",
+  "version": "0.0.1",
+  "description": "Convert a recent twitter thread into a blog post",
+  "main": "full-archive-search.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andytuba/tweet-thread-to-blog-post.git"
+  },
+  "keywords": [
+    "twitter",
+    "blog"
+  ],
+  "author": "andytuba",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/andytuba/tweet-thread-to-blog-post/issues"
+  },
+  "homepage": "https://github.com/andytuba/tweet-thread-to-blog-post#readme",
+  "dependencies": {
+    "needle": "^3.0.0",
+    "twit": "^2.2.11"
+  }
+}
