@@ -5,6 +5,7 @@ const arrayToTree = require('array-to-tree');
 const MS = {
     DAY: 24 * 60 * 60 * 1000,
 };
+const ROOT = Symbol("ROOT");
 
 const userAgent = process.env.USER_AGENT || 'andytuba app';
 const token = process.env.BEARER_TOKEN;
@@ -31,7 +32,6 @@ async function getRecentTweets() {
 
     console.debug('getRequest', endpointPath, params);
     const res = await T.get(endpointPath, params);
-    debugger;
     console.debug('getRequest response', res);
     if (!res || res.resp.statusCode !== 200) {
         console.error(res);
@@ -41,28 +41,35 @@ async function getRecentTweets() {
 }
 
 function collateThreads(statuses) {
-    const ROOT = Symbol("ROOT");
-    const nodes = statuses.map(model => ({
-        model,
-        id: model.id_str,
-        parent_id: model.in_reply_to_status_id_str || ROOT,
+    const nodes = statuses.map(status => ({
+        status,
+        id: status.id_str,
+        parent_id: status.in_reply_to_status_id_str || ROOT,
     }));
 
     const fromArray = arrayToTree(nodes);
-    console.debug('fromArray'); console.dir(fromArray);
-    const tree = new TreeModel().parse(fromArray);
-    console.log('tree');  console.dir(tree);
+    const tree = new TreeModel().parse({
+        id: ROOT,
+        children: fromArray,
+    });
+    console.log('tree');
+    tree.all(node => {
+        console.dir(node);
+    });
 
-    const tailsOfMyThreads = tree.all(node => {
+
+    const tailsOfMyThreads = tree.all({ strategy: 'post' }, node => {
         console.debug(`- tweet:`);
         console.dir(node);
         // Requirement: the tail of a thread
+        if (node.model.id === ROOT) { return; }
         if (!node.children) {
             console.error('  !- has children, not a tail');
             return false;
         }
         
         const ancestors = node.getPath();
+        if (ancestors[0].model.id === ROOT) ancestors.shift(); // dump the ROOT
         const root = ancestors.shift();
         // Requirement: I started this thread. (Prereq: these tweets are all authored by me.)
         // Requirement: this thread didn't start too long ago. (Prereq: these tweets are all authored recently.)
@@ -71,15 +78,17 @@ function collateThreads(statuses) {
             return false;
         }
         // Requirement: I am replying to myself and only myself in this thread.
-        if (ancestors.some(ancestor => ancestor.model.in_reply_to_user_id_str !== root.model.user.id_str)) {
-            console.error('  !- some ancestor tweet was replying to someone else, actually', ancestor.model.text);
+        if (ancestors.some(ancestor => ancestor.model.status.in_reply_to_user_id_str !== root.model.status.user.id_str)) {
+            console.error('  !- some ancestor tweet was replying to someone else, actually', ancestor.model.status.text);
             return false;
         };
 
         return true;
     });
 
-    const threadsMaybeOverlap = tailsOfMyThreads.map(tail => tail.getPath());
+    const threadsMaybeOverlap = tailsOfMyThreads
+        .map(tail => tail.getPath().slice(1))
+        .filter(nodes => nodes.length >= 3);
     // TODO: merge overlaps, sort by time, dedupe
     return threadsMaybeOverlap;
 }
@@ -99,11 +108,12 @@ function collateThreads(statuses) {
 
         console.log('\n======= THREADS ======= \n\n');
         for (const thread of threads) {
-            console.dir(thread.map(x => ({
-                id: x.model.id_str,
-                created_at: x.model.created_at,
-                text: x.model.text,
-            })));
+            for (const node of thread) {
+                console.log(`
+${node.model.status.text}
+[${node.model.status.id_str} @ ${node.model.status.created_at}]
+`);
+            }
             console.log('\n======= ====== ======= \n\n');
         }
         // TODO: unroll threads into posts
