@@ -22,8 +22,11 @@ var T = new Twit({
 
 async function getRecentTweets() {
     const date = new Date(new Date().getTime() - (2 * MS.DAY));
-    const endpointPath = 'search/tweets';
+    const endpointPath = 'statuses/user_timeline';
     const params = {
+        screen_name: username,
+        
+        include_rts: false,
         'q': `from:${username} -is:retweet since:${date.toISOString().split('T')[0]}`,
         count: 100,
         result_type: 'recent',
@@ -78,7 +81,8 @@ function collateThreads(statuses) {
             return false;
         }
         // Requirement: I am replying to myself and only myself in this thread.
-        if (ancestors.some(ancestor => ancestor.model.status.in_reply_to_user_id_str !== root.model.status.user.id_str)) {
+        // TODO: fix - just 
+        if (ancestors.some(ancestor => ancestor.model.status.in_reply_to_screen_name.toLowerCase() !== username.toLowerCase())) {
             console.error('  !- some ancestor tweet was replying to someone else, actually', ancestor.model.status.text);
             return false;
         };
@@ -98,13 +102,13 @@ function collateThreads(statuses) {
 
 (async function main() {
     try {
-        const searchResults = await getRecentTweets();
+        const statuses = await getRecentTweets();
         console.log('getRequest data');
-        console.dir(searchResults, {
+        console.dir(statuses, {
             depth: null
         });
 
-        const threads = collateThreads(searchResults.statuses);
+        const threads = collateThreads(statuses);
 
         console.log('\n======= THREADS ======= \n\n');
         for (const thread of threads) {
